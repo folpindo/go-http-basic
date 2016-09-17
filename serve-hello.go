@@ -4,11 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	//"github.com/gorilla/mux"
 	"log"
-	//"reflect"
-	//"github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/knq/xo/examples/mssql/models"
 )
 
 var Params map[string]interface{}
