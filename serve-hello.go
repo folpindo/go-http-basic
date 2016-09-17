@@ -1,20 +1,25 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"encoding/json"
+	//"github.com/gorilla/mux"
+	"log"
+	//"reflect"
+	//"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/knq/xo/examples/mssql/models"
 )
 
 var Params map[string]interface{}
 
 type Configuration struct {
-	Params map[string]interface {}
+	Params map[string]interface{}
 }
 
 func (config Configuration) setConfigFile(configFile string) {}
 
-func (config Configuration) get(key string) (interface{}) {
+func (config Configuration) get(key string) interface{} {
 	return config.Params[key]
 }
 
@@ -26,15 +31,15 @@ type RouteConfiguration struct {
 	Routes map[string]interface{}
 }
 
-func (routeConfig RouteConfiguration) setRouteConfiguration(config interface{}){
+func (routeConfig RouteConfiguration) setRouteConfiguration(config interface{}) {
 	routeConfig.Routes = config.(map[string]interface{})
 }
 
-func (routeConfig RouteConfiguration) getRouteConfiguration(key string) (interface{}) {
+func (routeConfig RouteConfiguration) getRouteConfiguration(key string) interface{} {
 	return routeConfig.Routes[key]
 }
 
-func (routeConfig RouteConfiguration) setConfiguration (config Configuration, key string) {
+func (routeConfig RouteConfiguration) setConfiguration(config Configuration, key string) {
 	params := config.Params
 	routeConfig.setRouteConfiguration(params)
 }
@@ -50,11 +55,11 @@ func (route Route) getConfig() RouteConfiguration {
 	return route.Configuration
 }
 
-func (route Route) create () {
+func (route Route) create() {
 
 }
 
-type Front struct {}
+type Front struct{}
 
 type Controller interface {
 	PreDispatch()
@@ -62,13 +67,13 @@ type Controller interface {
 	PostDispatch()
 }
 
-type Index struct {}
+type Index struct{}
 
 func (index *Index) init() {
 
 }
 
-func (index *Index) indexAction(){
+func (index *Index) indexAction() {
 
 }
 
@@ -80,22 +85,22 @@ func (reg *Registry) set(key string, value interface{}) {
 	reg.Params[key] = value
 }
 
-func (reg *Registry) get(key string) (interface{}) {
+func (reg *Registry) get(key string) interface{} {
 	return reg.Params[key]
 }
 
-type handler func (w http.ResponseWriter, r *http.Request)
+type handler func(w http.ResponseWriter, r *http.Request)
 
 type Application struct {
 	Response http.ResponseWriter
-	Request *http.Request
-	Handler handler
-	Routes map[string]handler
+	Request  *http.Request
+	Handler  handler
+	Routes   map[string]handler
 }
 
-func (app *Application) Run () {
+func (app *Application) Run() {
 	fmt.Println("testing run")
-	http.ListenAndServe(":9091", nil)
+	http.ListenAndServe(":8001", nil)
 }
 
 func (app *Application) setResponseWriter(w http.ResponseWriter) {
@@ -106,16 +111,55 @@ func (app *Application) setRequest(r *http.Request) {
 	app.Request = r
 }
 
-func (app *Application) Handle(path string,data map[string]interface{}) (map[string]interface{}) {
-	data["inclusion"] = "myhandler"
-	data["inclusion2"] = "myhandler2"
-	return data
+//func (app *Application) Handle(path string,data map[string]interface{}) (map[string]interface{}) {
+//	data["inclusion"] = "myhandler"
+//	data["inclusion2"] = "myhandler2"
+//	return data
+//}
+type CommitDetails struct {
+	Added interface{}	`json:"added"`
+	Author interface{}	`json:"author"`
+
 }
 
-func rootHandle (w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type","application/json")
+type GitWebHookPayload struct {
+	EventName     string      `json:"event_name"`
+	UserName      string      `json:"user_name"`
+	UserEmail     string      `json:"user_email`
+	RefSpec       string      `json:"ref"`
+	OldRev        string      `json:"before"`
+	NewRev        string      `json:"after"`
+	TagAnnotation string      `json:"message"`
+	TotalCommits  int      `json:"total_commits_count"`
+	Commits       interface{} `json:"commits"`
+	CheckoutSha   string      `json:"rev"`
+	Project       interface{} `json:"project"`
+}
+
+func (app *Application) rootHandle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	decoder := json.NewDecoder(r.Body)
+	m := GitWebHookPayload{}
 	enc := json.NewEncoder(w)
+	err := decoder.Decode(&m)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(m.EventName)
+	fmt.Println(m.UserName)
+	fmt.Println(m.UserEmail)
+	fmt.Println(m.RefSpec)
+	fmt.Println(m.OldRev)
+	fmt.Println(m.NewRev)
+	fmt.Println(m.TagAnnotation)
+	fmt.Println(m.TotalCommits)
+	fmt.Println(m.Commits)
+	fmt.Println(m.CheckoutSha)
+	fmt.Println(m.Project)
+
 	d := make(map[string]string)
 	d["testing"] = "ok"
 	if err := enc.Encode(d); nil != err {
@@ -123,10 +167,12 @@ func rootHandle (w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *Application) InitRoutes () {
+func (app *Application) InitRoutes() {
+	//router := mux.NewRouter()
+	//router.Path("/").Name("root").Handler(handler(app.rootHandle))
 	app.Routes = make(map[string]handler)
-	app.Routes["/myroute"] = handler(rootHandle)
-	app.Route("/myroute")
+	app.Routes["/"] = handler(app.rootHandle)
+	app.Route("/")
 }
 
 func (app *Application) GetHandler(path string) {
@@ -134,17 +180,17 @@ func (app *Application) GetHandler(path string) {
 	app.Handler = handler(pathHandler)
 }
 
-func (app *Application) Route (path string) {
+func (app *Application) Route(path string) {
 	app.GetHandler(path)
 	http.HandleFunc(
-		path,handler(app.Handler),
+		path, handler(app.Handler),
 	)
 }
 
 func main() {
-	reg := Registry{Params:make(map[string]interface{})}
+	reg := Registry{Params: make(map[string]interface{})}
 	app := Application{}
-	reg.set("app",app)
+	reg.set("app", app)
 	myapp := reg.get("app").(Application)
 	data := make(map[string]interface{})
 	data["testing"] = "sample"
