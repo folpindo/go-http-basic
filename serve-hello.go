@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"log"
+	"net/http"
 )
 
 var Params map[string]interface{}
@@ -95,7 +95,7 @@ type Application struct {
 }
 
 func (app *Application) Run() {
-	fmt.Println("testing run")
+	fmt.Println("Listening on port 8001...")
 	http.ListenAndServe(":8001", nil)
 }
 
@@ -113,9 +113,24 @@ func (app *Application) setRequest(r *http.Request) {
 //	return data
 //}
 type CommitDetails struct {
-	Added interface{}	`json:"added"`
-	Author interface{}	`json:"author"`
-
+	Added  interface{} `json:"added"`
+	Author interface{} `json:"author"`
+}
+type Project struct {
+	AvatarUrl         string `json:"avatar_url"`
+	DefaultBranch     string `json:"default_branch"`
+	Description       string `json:"description"`
+	GitHttpUrl        string `json:"git_http_url"`
+	GitSshUrl         string `json:"git_ssh_url"`
+	Homepage          string `json:"homepage"`
+	HttpUrl           string `json:"http_url"`
+	Name              string `json:"name"`
+	Namespace         string `json:"namespace"`
+	PathWithNamespace string `json:"path_with_namespace"`
+	SshUrl            string `json:"ssh_url"`
+	Url               string `json:"url"`
+	VisibilityLevel   int    `json:"visibility_level"`
+	WebUrl            string `json:"web_url"`
 }
 
 type GitWebHookPayload struct {
@@ -126,17 +141,35 @@ type GitWebHookPayload struct {
 	OldRev        string      `json:"before"`
 	NewRev        string      `json:"after"`
 	TagAnnotation string      `json:"message"`
-	TotalCommits  int      `json:"total_commits_count"`
+	TotalCommits  int         `json:"total_commits_count"`
 	Commits       interface{} `json:"commits"`
 	CheckoutSha   string      `json:"rev"`
-	Project       interface{} `json:"project"`
+	Project       Project     `json:"project"`
 }
 
+type Mailer struct {
+}
+
+type Worker struct {
+}
+
+type Annotation struct {
+	Message string
+}
+
+/**
+@todo:
+1. identify job
+2. parsing of annotation (as parameter)
+*/
 func (app *Application) rootHandle(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+
 	decoder := json.NewDecoder(r.Body)
 	m := GitWebHookPayload{}
+
 	enc := json.NewEncoder(w)
 	err := decoder.Decode(&m)
 
@@ -144,20 +177,26 @@ func (app *Application) rootHandle(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
-	fmt.Println(m.EventName)
-	fmt.Println(m.UserName)
-	fmt.Println(m.UserEmail)
-	fmt.Println(m.RefSpec)
-	fmt.Println(m.OldRev)
-	fmt.Println(m.NewRev)
-	fmt.Println(m.TagAnnotation)
-	fmt.Println(m.TotalCommits)
-	fmt.Println(m.Commits)
-	fmt.Println(m.CheckoutSha)
-	fmt.Println(m.Project)
+	fmt.Println("Event name:", m.EventName)
+	fmt.Println("Username:", m.UserName)
+	fmt.Println("User email:", m.UserEmail)
+	fmt.Println("Refspec:", m.RefSpec)
+	fmt.Println("Old rev:", m.OldRev)
+	fmt.Println("New rev:", m.NewRev)
+	fmt.Println("Tag Annotation:", m.TagAnnotation)
+	//fmt.Println(m.TotalCommits)
+	//fmt.Println(m.Commits)
+	//fmt.Println(m.CheckoutSha)
+	fmt.Println("Project Details:", m.Project.PathWithNamespace)
+	fmt.Println("Project Details:", m.Project.Name)
+	fmt.Println("Project Details:", m.Project.Namespace)
+	fmt.Println("Project Details:", m.Project.Url)
+	fmt.Println("Project Details:", m.Project.Homepage)
+	fmt.Println("Project Details:", m.Project.GitHttpUrl)
+	fmt.Println("Project Details:", m.Project.GitSshUrl)
 
 	d := make(map[string]string)
-	d["testing"] = "ok"
+	d["Status"] = "Ok"
 	if err := enc.Encode(d); nil != err {
 		fmt.Fprintf(w, `{"error":"%s"}`, err)
 	}
@@ -184,13 +223,15 @@ func (app *Application) Route(path string) {
 }
 
 func main() {
-	reg := Registry{Params: make(map[string]interface{})}
+	//reg := Registry{Params: make(map[string]interface{})}
 	app := Application{}
-	reg.set("app", app)
-	myapp := reg.get("app").(Application)
-	data := make(map[string]interface{})
-	data["testing"] = "sample"
 	app.InitRoutes()
-	fmt.Println(myapp)
-	myapp.Run()
+	app.Run()
+	//reg.set("app", app)
+	//myapp := reg.get("app").(Application)
+	//data := make(map[string]interface{})
+	//data["testing"] = "sample"
+
+	//fmt.Println(myapp)
+	//myapp.Run()
 }
