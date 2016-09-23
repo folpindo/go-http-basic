@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 var Params map[string]interface{}
@@ -107,15 +108,14 @@ func (app *Application) setRequest(r *http.Request) {
 	app.Request = r
 }
 
-//func (app *Application) Handle(path string,data map[string]interface{}) (map[string]interface{}) {
-//	data["inclusion"] = "myhandler"
-//	data["inclusion2"] = "myhandler2"
-//	return data
-//}
-type CommitDetails struct {
-	Added  interface{} `json:"added"`
-	Author interface{} `json:"author"`
+type ServerEnvironmentSettings struct {
+
 }
+
+func (env *ServerEnvironmentSettings) getConfig(key string) string {
+	return ""
+}
+
 type Project struct {
 	AvatarUrl         string `json:"avatar_url"`
 	DefaultBranch     string `json:"default_branch"`
@@ -154,14 +154,24 @@ type Worker struct {
 }
 
 type Annotation struct {
-	Message string
+	OriginalMessage string
+	Project	string
+	Release	string
 }
 
-/**
-@todo:
-1. identify job
-2. parsing of annotation (as parameter)
-*/
+func (a *Annotation) Parse () (map[string]string){
+	msg := a.OriginalMessage
+	var msgDetails []string
+	ret := make(map[string]string)
+	if msg != "" {
+		msgDetails = strings.Split(msg,"[")
+		ret["project"] = strings.Replace(msgDetails[1],"]", "",-1)
+		rel := strings.Split(msgDetails[2],"]")
+		ret["release"] = rel[0]
+	}
+	return ret
+}
+
 func (app *Application) rootHandle(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -177,23 +187,25 @@ func (app *Application) rootHandle(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Event name:", m.EventName)
-	fmt.Println("Username:", m.UserName)
-	fmt.Println("User email:", m.UserEmail)
-	fmt.Println("Refspec:", m.RefSpec)
-	fmt.Println("Old rev:", m.OldRev)
-	fmt.Println("New rev:", m.NewRev)
-	fmt.Println("Tag Annotation:", m.TagAnnotation)
-	//fmt.Println(m.TotalCommits)
-	//fmt.Println(m.Commits)
-	//fmt.Println(m.CheckoutSha)
-	fmt.Println("Project Details:", m.Project.PathWithNamespace)
-	fmt.Println("Project Details:", m.Project.Name)
-	fmt.Println("Project Details:", m.Project.Namespace)
-	fmt.Println("Project Details:", m.Project.Url)
-	fmt.Println("Project Details:", m.Project.Homepage)
-	fmt.Println("Project Details:", m.Project.GitHttpUrl)
-	fmt.Println("Project Details:", m.Project.GitSshUrl)
+	annotation := m.TagAnnotation
+	eventName := m.EventName
+
+	if annotation != "" && eventName == "tag_push" {
+		annotation := m.TagAnnotation
+		ann := Annotation{OriginalMessage:annotation}
+		details := ann.Parse()
+		project := details["project"]
+		token := "mytoken"
+		baseUrl:="http://myci.com:8080"
+		url:=fmt.Sprintf("%s/job/%s/build?token=%s" ,baseUrl,project,token)
+		resp,err := http.Get(url)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer resp.Body.Close()
+		//fmt.Println(resp)
+	}
 
 	d := make(map[string]string)
 	d["Status"] = "Ok"
@@ -203,8 +215,6 @@ func (app *Application) rootHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Application) InitRoutes() {
-	//router := mux.NewRouter()
-	//router.Path("/").Name("root").Handler(handler(app.rootHandle))
 	app.Routes = make(map[string]handler)
 	app.Routes["/"] = handler(app.rootHandle)
 	app.Route("/")
@@ -223,15 +233,7 @@ func (app *Application) Route(path string) {
 }
 
 func main() {
-	//reg := Registry{Params: make(map[string]interface{})}
 	app := Application{}
 	app.InitRoutes()
 	app.Run()
-	//reg.set("app", app)
-	//myapp := reg.get("app").(Application)
-	//data := make(map[string]interface{})
-	//data["testing"] = "sample"
-
-	//fmt.Println(myapp)
-	//myapp.Run()
 }
